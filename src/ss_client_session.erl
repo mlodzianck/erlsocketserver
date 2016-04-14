@@ -122,8 +122,8 @@ handle_cast({receive_from_socket,{data,Bin}}, State=#state{poll_fun = PollFun,to
   end.
 
 
-handle_info({'EXIT',SocketPid,Reason}, State=#state{socket_pid = SocketPid}) ->
-  error_logger:info_msg("Socket process died due to ~p",[Reason]),
+handle_info({'EXIT',SocketPid,normal}, State=#state{socket_pid = SocketPid}) ->
+  error_logger:info_msg("Socket process died due to ~p, but we alrawedy know about it",[normal]),
   {noreply, State#state{socket_pid = undefined}};
 handle_info(Info, State) ->
   error_logger:info_msg("Got other Info ~p",[Info]),
