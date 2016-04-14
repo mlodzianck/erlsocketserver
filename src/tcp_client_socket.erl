@@ -3,7 +3,7 @@
 
 -behaviour(gen_server).
 
--export([start/3]).
+-export([start/3,send/2,stop/1]).
 
 -define(CONNECT_TIMEOUT,1000).
 
@@ -18,6 +18,12 @@
 
 -record(state, {socket,client_session_pid}).
 
+stop(Pid) ->
+  gen_server:cast(Pid,{stop}).
+
+send(Pid,Bin) ->
+  gen_server:call(Pid,{send,Bin}).
+
 start(IpAddr,Port,ClientSessionPid) ->
   gen_server:start(?MODULE, {IpAddr,Port,ClientSessionPid}, []).
 
@@ -28,18 +34,31 @@ init({IpAddr,Port,ClientSessionPid}) ->
   end.
 
 
-handle_call(_Request, _From, State) ->
-  {reply, ok, State}.
+handle_call({send,Bin}, _From, State=#state{socket = Socket}) ->
+  {reply, gen_tcp:send(Socket,Bin), State}.
 
+handle_cast({stop}, State) ->
+  {stop,normal, State};
 handle_cast(_Request, State) ->
   {noreply, State}.
-handle_info({tcp, _, Bin}, State ) ->
+
+
+handle_info({tcp, _, Bin}, State = #state{client_session_pid = SSPid}) ->
   inet:setopts(State#state.socket, [{active, once}]),
+  ss_client_session:receive_from_socket(SSPid,{data,Bin}),
   {noreply, State};
-handle_info(_Info, State) ->
+
+handle_info({tcp_closed,Socket}, State=#state{socket= Socket,client_session_pid = SSPid}) ->
+  error_logger:info_msg("Socket closed"),
+  ss_client_session:receive_from_socket(SSPid,{soket_closed}),
+  {stop,normal, State};
+
+handle_info(Info, State) ->
+  error_logger:info_msg("Got other info from socket ~p",[Info]),
   {noreply, State}.
 
 terminate(_Reason, _State) ->
+  error_logger:info_msg("Terminating tcp_client_socket process"),
   ok.
 
 code_change(_OldVsn, State, _Extra) ->

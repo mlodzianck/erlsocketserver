@@ -37,10 +37,18 @@ loop(Req) ->
 
 handle_get(Req) ->
   Fun = fun() ->
+          Pid = self(),
+          erlang:send_after(5000,Pid,msg),
           receive
-            _-> Req:respond({200, [], "200 OK\r\n"++pid_to_list(self())})
+
+            msg ->
+              error_logger:info_msg("sending response, my pid is = ~p",[Pid]),
+              Ret = (catch Req:respond({200, [], "200 OK\r\n"++pid_to_list(self())})),
+              error_logger:info_msg("Result from Req:respond = ~p",[Ret]);
+            Other -> error_logger:info_msg("Received ~p",[Other])
           end
         end,
   Pid  = spawn(Fun),
-  erlang:send_after(5000,Pid,msg).
+  error_logger:info_msg("spawned delayed response with pid ~p",[Pid]).
+
 
