@@ -39,8 +39,7 @@ handle_post(Req, "poll/"++Id) ->
   case Pid of
     {error,_}->  Req:not_found();
     _ ->
-      ss_client_session:set_poll_pid(Pid),
-
+      poll(Pid),
       receive
           Msg ->
             JSon = mochijson2:encode(encode_msg(Msg)),
@@ -60,6 +59,23 @@ handle_get(Req,"create") ->
   Req:respond({200, [{"Content-Type", "application/json"}], [Reply]});
 
 handle_get(Req,_) -> Req:not_found().
+
+poll(SSClientSessionPid) ->
+  Self = self(),
+  PollFun = fun(Msg) ->
+              Self ! Msg,
+              ok
+            end,
+
+
+  PollProcessFun  = fun() ->
+            link(Self),
+            ss_client_session:set_poll_fun(SSClientSessionPid,PollFun)
+          end,
+  spawn(PollProcessFun).
+
+
+
 
 
 
@@ -91,8 +107,8 @@ encode_msg(List) ->
   encode_msg(List,[]).
 encode_msg([#{event_type := data,payload := Bin}|Rest],Acc) ->
   encode_msg(Rest,Acc++[{struct, [{"e",<<"d">>},{<<"data">>,base64:encode(Bin)}]}]);
-encode_msg([#{event_type := socket_closed}|Rest],Acc) ->
-  encode_msg(Rest,Acc++[{struct, [{"e",<<"e">>},{<<"event">>,<<"closed">>}]}]);
+encode_msg([#{event_type := socket_closed,total_rcvd := Cnt}|Rest],Acc) ->
+  encode_msg(Rest,Acc++[{struct, [{"e",<<"e">>},{"total_rcvd",Cnt},{<<"event">>,<<"closed">>}]}]);
 encode_msg([],Acc) -> Acc.
 
 
