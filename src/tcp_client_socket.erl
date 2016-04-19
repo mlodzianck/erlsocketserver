@@ -49,16 +49,16 @@ handle_info({tcp, _, Bin}, State = #state{client_session_pid = SSPid}) ->
   {noreply, State};
 
 handle_info({tcp_closed,Socket}, State=#state{socket= Socket,client_session_pid = SSPid}) ->
-  error_logger:info_msg("Socket closed"),
+  lager:debug("Socket closed (by remote??)"),
   ss_client_session:receive_from_socket(SSPid,{soket_closed}),
   {stop,normal, State};
 
 handle_info(Info, State) ->
-  error_logger:info_msg("Got other info from socket ~p",[Info]),
+ lager:debug("Got other info from socket ~p",[Info]),
   {noreply, State}.
 
 terminate(_Reason, _State) ->
-  error_logger:info_msg("Terminating tcp_client_socket process"),
+ lager:debug("Terminating tcp_client_socket process"),
   ok.
 
 code_change(_OldVsn, State, _Extra) ->
