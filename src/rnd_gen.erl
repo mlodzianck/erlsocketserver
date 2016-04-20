@@ -21,8 +21,7 @@
 -record(state, {}).
 
 start_link() ->
-  <<A:32, B:32, C:32>> = crypto:strong_rand_bytes(12),
-  random:seed({A,B,C}),
+  random:seed(erlang:now()),
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 gen_random_id() ->
   gen_server:call(?SERVER,{gen_random_id}).
