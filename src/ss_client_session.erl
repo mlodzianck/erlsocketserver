@@ -106,20 +106,19 @@ handle_cast({set_poll_fun, PollFun}, State = #state{to_client_queue = ToClientQu
 
 
 handle_cast({soket_closed}, State = #state{poll_fun = undefined, to_client_queue = ToClientQueue, rcvd_cnt = RCnt, id = Id}) ->
-  lager:debug("Socket reported close, storing queue in silo, since we don't have poll fun present"),
+  lager:debug("Socket reported close, but we don't have poll fun present"),
   Queue = ToClientQueue ++ [socked_closed_event(RCnt)],
-  ss_client_msg_silo:store(Id, Queue),
-  {stop, normal, State#state{to_client_queue = []}};
+  {stop, normal, State#state{to_client_queue = Queue}};
 
 handle_cast({soket_closed}, State = #state{poll_fun = PollFun, to_client_queue = ToClientQueue, rcvd_cnt = RCnt, id = Id}) ->
   Queue = ToClientQueue ++ [socked_closed_event(RCnt)],
   case invoke_poll_fun(PollFun, Queue) of
     fail ->
-      lager:debug("Socket reported close, storing queue in silo, since poll fn returned error"),
-      ss_client_msg_silo:store(Id, Queue);
-    _ -> noop
-  end,
-  {stop, normal, State#state{poll_fun = undefined, to_client_queue = []}};
+      lager:debug("Socket reported close, poll fn returned error"),
+      {stop, normal, State#state{poll_fun = undefined, to_client_queue = Queue}};
+    _ -> {stop, normal, State#state{poll_fun = undefined, to_client_queue = []}}
+  end;
+
 
 
 handle_cast({receive_from_socket, {data, Bin}}, State = #state{poll_fun = undefined, to_client_queue = ToClientQueue, counter = Cnt, rcvd_cnt = RCnt}) ->
@@ -143,8 +142,8 @@ handle_info(Info, State) ->
 
 terminate(Reason, #state{id = Id, socket_pid = SocketPid, counter = Counter, to_client_queue = Queue, rcvd_cnt = Rcnt}) ->
   if
-    length(Queue) > 0 -> error_logger:error_msg("Queue has len > 0 ( ~p ) storing to silo", [length(Queue)]),
-                         ss_client_msg_silo:store(Id, Queue);
+    length(Queue) > 0 -> lager:debug("Queue has len > 0 ( ~p ) storing to silo", [length(Queue)]),
+                           ss_client_msg_silo:store(Id, Queue);
     true -> ok
   end,
   ss_client_session_mapper:delete(Id),

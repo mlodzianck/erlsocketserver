@@ -30,13 +30,16 @@ start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 init([]) ->
+  process_flag(trap_exit,true),
   {ok, #state{mappings=#{}}}.
 
 
 
 handle_call({put,Id,Pid}, _From, State=#state{mappings = M}) ->
   case maps:is_key(Id,M) of
-    false ->   {reply, ok, State#state{mappings = M#{Id => Pid}}};
+    false ->
+      link(Pid),
+      {reply, ok, State#state{mappings = M#{Id => Pid}}};
     _ -> {reply, {error,already_exist}, State}
   end;
 
@@ -60,8 +63,18 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Request, State) ->
   {noreply, State}.
 
-handle_info(_Info, State) ->
-  {noreply, State}.
+handle_info({'EXIT', Pid, Reason}, State=#state{mappings = M}) ->
+  Pred = fun(_,V) ->
+              if
+                V=:=Pid ->
+                      lager:debug("Pid  ~p reported exit due to ~p, removing from mapping",[Pid,Reason]),
+                      false;
+                true -> true
+              end
+         end,
+  NewMap = maps:filter(Pred,M),
+  {noreply, State#state{mappings = NewMap}};
+handle_info(_,State) -> {noreply,State}.
 
 terminate(_Reason, _State) ->
   ok.

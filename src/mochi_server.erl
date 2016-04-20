@@ -30,8 +30,8 @@ loop(Req) ->
     end
   catch
     Why:Err ->
-      erlang:display(erlang:get_stacktrace()),
-      lager:debug("Exception ~p ~p", [Why, Err])
+      lager:debug("Exception ~p ~p", [Why, Err]),
+      Req:respond({501, [], []})
   end.
 
 
@@ -64,15 +64,17 @@ handle_post(Req, "poll/"++Id) ->
 
 handle_post(Req,_) -> Req:not_found().
 
+handle_get(Req,[]) -> Req:serve_file("index.html", "web/");
+
 handle_get(Req,"long") ->
   receive
     after 5000 -> Req:not_found()
   end;
 
 handle_get(Req,"create") ->
-  {ok,Id} = ss_client_session:start(tcp_client,#{ipaddr => "wp.pl",port => 80 }),
-  Pid = ss_client_session_mapper:get(Id),
-  ss_client_session:send_to_socket(Pid,list_to_binary("GET / HTTP/1.1\r\nHost: www.wp.pl\r\n\r\n")),
+  {ok, CSPid} = ss_client_session_sup:start_ss_client_session(tcp_client, #{ipaddr => "wp.pl", port => 80}),
+  Id = ss_client_session:get_id(CSPid),
+  ss_client_session:send_to_socket(CSPid,list_to_binary("GET / HTTP/1.1\r\nHost: www.wp.pl\r\n\r\n")),
   Reply =  mochijson2:encode({struct, [{<<"id">>,list_to_binary(Id)}]}),
   Req:respond({200, [{"Content-Type", "application/json"}], [Reply]});
 

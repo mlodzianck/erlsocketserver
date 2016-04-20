@@ -7,8 +7,6 @@
 
 
 start(_StartType, _StartArgs) ->
-    lager:start(),
-    lager:set_loglevel(lager_console_backend, debug),
     erlsocketserver_sup:start_link().
 
 stop(_State) ->
