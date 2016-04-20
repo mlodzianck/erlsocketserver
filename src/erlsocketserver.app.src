@@ -7,6 +7,6 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { erlsocketserver_sup, []}},
+  {mod, {erlsocketserver_app, []}},
   {env, []}
  ]}.

@@ -4,11 +4,12 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2,
+-export([start_link/2,
   send_to_socket/2,
   receive_from_socket/2,
   close_socket/1,
-  set_poll_fun/2]).
+  set_poll_fun/2,
+  get_id/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,14 +41,23 @@ receive_from_socket(Pid, {soket_closed}) ->
 close_socket(Pid) ->
   gen_server:call(Pid, {close_socket}).
 
-start(Type, Opts) ->
-  Id = utils:generate_random_str(10),
-  {ok, Pid} = gen_server:start(?MODULE, {Type, Id}, []),
+start_link(Type, Opts) ->
+  Id = rnd_gen:gen_random_id(),
+  case gen_server:start_link(?MODULE, {Type, Id}, []) of
+    {ok, Pid} ->
+      do_bootstrap(Pid,Id,Opts);
+    Else -> Else
+  end.
+
+do_bootstrap(Pid,Id,Opts) ->
   ok = ss_client_session_mapper:put(Id, Pid),
   case gen_server:call(Pid, {bootstrap, Opts}) of
-    ok -> {ok, Id};
+    ok -> {ok, Pid};
     {error, Err} -> {error, Err}
   end.
+
+get_id(Pid) ->
+  gen_server:call(Pid,{get_id}).
 
 
 
@@ -77,6 +87,8 @@ handle_call({close_socket}, _From, State = #state{type = tcp_client, socket_pid 
   tcp_client_socket:stop(SocketPid),
   {stop, normal,ok, State#state{to_client_queue =  Queue ++ [socked_closed_event(RCnt)]}};
 
+handle_call({get_id}, _From, State = #state{id = Id}) ->
+  {reply, Id, State};
 
 handle_call({send_to_socket, Bin}, _From, State = #state{type = tcp_client, socket_pid = SocketPid}) ->
   {reply, tcp_client_socket:send(SocketPid, Bin), State}.

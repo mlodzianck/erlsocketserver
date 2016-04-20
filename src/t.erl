@@ -14,24 +14,23 @@
 -compile(export_all).
 
 setup() ->
-  ss_client_session_mapper:start_link(),
-  ss_client_msg_silo:start_link().
+
+  observer:start(),
+  application:start(erlsocketserver).
+
 
 t() ->
-  lager:error("~p", [mochi_server:start_link()]).
-
+  lager:debug("mochi started with pid ~p", [mochiserver_sup:start_link()]).
 
 t1() ->
-  spawn(fun t11/0).
 
-t11() ->
-
-  {ok, Id} = ss_client_session:start(tcp_client, #{ipaddr => "wp.pl", port => 80}),
+  {ok, SSPid} = ss_client_session_sup:start_ss_client_session(tcp_client, #{ipaddr => "wp.pl", port => 80}),
+  Id = ss_client_session:get_id(SSPid),
   lager:debug("~p ", [Id]),
   Pid = ss_client_session_mapper:get(Id),
   lager:debug("Pid for id ~p = ~p",[Id,Pid]),
   ss_client_session:send_to_socket(Pid, list_to_binary("GET / HTTP/1.1\r\nHost: www.wp.pl\r\n\r\n")),
-  ss_client_session:close_socket(Pid),
+%%  ss_client_session:close_socket(Pid),
 
 
   receive
